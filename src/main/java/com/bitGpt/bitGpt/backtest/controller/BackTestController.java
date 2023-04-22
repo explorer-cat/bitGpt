@@ -1,14 +1,13 @@
 package com.bitGpt.bitGpt.backtest.controller;
 
+import com.bitGpt.bitGpt.backtest.dto.BackTestResultResponseDto;
+import com.bitGpt.bitGpt.backtest.dto.TestRequestDto;
 import com.bitGpt.bitGpt.backtest.service.BackTestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -21,8 +20,8 @@ public class BackTestController {
     private BackTestService backTestService;
 
 
-    @GetMapping
-    public Object getBackTestResult() {
-        return backTestService.getBackTestResult();
+    @PostMapping
+    public List<BackTestResultResponseDto> getBackTestResult(@RequestBody TestRequestDto requestDto) {
+        return backTestService.getBackTestResult(requestDto);
     }
 }
