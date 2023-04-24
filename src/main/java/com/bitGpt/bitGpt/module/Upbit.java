@@ -111,13 +111,13 @@ public class Upbit {
 
     private static final String API_URL = "https://api.upbit.com/v1/candles/days";
 
-    public List<Candle> getDailyCandles(String market, int count) throws Exception {
+    public List<Candle> getDailyCandles(String market, long count) throws Exception {
         LocalDateTime to = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         List<Candle> candles = new ArrayList<>();
 
         while (candles.size() < count) {
-            int remaining = count - candles.size();
+            long remaining = count - candles.size();
             String url = String.format("%s?market=%s&count=%d&to=%s", API_URL, market, remaining, to.format(formatter));
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode rootNode = objectMapper.readValue(new URL(url), JsonNode.class);
@@ -138,7 +138,7 @@ public class Upbit {
             to = LocalDateTime.parse(rootNode.get(rootNode.size() - 1).get("candle_date_time_utc").asText(), formatter);
         }
 
-        return candles.subList(0, count);
+        return candles.subList(0, (int) count);
     }
 
 

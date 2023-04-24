@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @RequiredArgsConstructor
@@ -29,10 +30,22 @@ public class BackTestServiceImpl implements BackTestService {
     DecimalFormat df = new DecimalFormat("0.00");
 
 
+    /**
+     * @title 올인 이평선 전략 백테스팅
+     * @param request
+     * @return
+     */
     @Override
     public List<BackTestResultResponseDto> getBackTestResult(TestRequestDto request) {
-        int candleCount = 400;
-        int endCount = 400; // 0~endCount까지
+        LocalDateTime startDate = request.getStartDate();
+        LocalDateTime endDate = request.getEndDate();
+
+        long candleCount = ChronoUnit.DAYS.between(startDate.toLocalDate(), endDate.toLocalDate()) + 9;
+        long endCount = candleCount;//((ChronoUnit.DAYS.between(endDate.toLocalDate(), LocalDateTime.now().toLocalDate())) + candleCount) - 1;
+
+        System.out.println("candleCount" + candleCount);
+        System.out.println("endCount" + endCount);
+
         List<BackTestResultResponseDto> result = new ArrayList<>();
         List<Map<String, Object>> coin_list = new ArrayList<>();
 
@@ -45,7 +58,10 @@ public class BackTestServiceImpl implements BackTestService {
 
         Upbit upbit = new Upbit();
         UpbitBackTest upbitBackTest = new UpbitBackTest();
-        BackTestResultResponseDto backTestResultResponseDto = null;
+
+        BackTestResultResponseDto backTestResultResponseDto;
+
+
         for (Map<String, Object> coin : coin_list) {
             backTestResultResponseDto = new BackTestResultResponseDto();
             boolean isBuy = false;
@@ -68,7 +84,7 @@ public class BackTestServiceImpl implements BackTestService {
                 //과거부터 계산해야함으로 list를 한번 뒤집어준다.
                 Collections.reverse(ohlcv);
 
-                ohlcv = ohlcv.subList(0, endCount);
+                ohlcv = ohlcv.subList(0, (int) endCount);
 
 
                 double[] buy_ma1 = upbitBackTest.getTestMA(ohlcv, buy_MA_list[0]);
@@ -116,10 +132,11 @@ public class BackTestServiceImpl implements BackTestService {
 
                     conclusionRes.setEnterDate(current_date);
                     //해당 코인을 보유하고있을 경우 매도할지 확인함.
+
                     if (isBuy) {
                         //현재 수익률 계속 계산하기
                         invenstMoney = Math.floor(invenstMoney * (1.0 + ((current_open_price - prev_open_price) / prev_open_price)));
-                        conclusionRes.setCurrentBalanceKrw(invest_rate);
+                        conclusionRes.setCurrentBalanceKrw(invenstMoney);
                         //매도 이평선 조건에 맞는지 확인
                         if (prev_close_price < current_sell_ma1 && prev_close_price < current_sell_ma2) {
                             double rate = (current_open_price - buy_price) / buy_price;
@@ -165,7 +182,7 @@ public class BackTestServiceImpl implements BackTestService {
                                 conclusionRes.setEnterType("buy");
                                 conclusionRes.setEnterPrice(current_open_price);
                                 conclusionRes.setCurrentBalanceKrw(invenstMoney);
-                                conclusionRes.setSingleRate(-9999);
+                                conclusionRes.setSingleRate(0);
                                 conclusionRes.setTotalRate(((invenstMoney - origin_invenstMoney) / origin_invenstMoney) * 100.0);
 
                                 System.out.println("[매수]" + ticker + " 종목 잔고 : " + invenstMoney + " 매수가 : " + current_open_price);
@@ -174,16 +191,49 @@ public class BackTestServiceImpl implements BackTestService {
                                 System.out.println("전일 20% 이상 급등으로 매수하지 않았습니다.");
                             }
                         } else {
-                            System.out.println("매수 이평선 조건이 아닙니다.");
+//                            System.out.println("매수 이평선 조건이 아닙니다.");
                         }
                     }
+
+//                    if(((invenstMoney - origin_invenstMoney) / origin_invenstMoney) * 100.0 > 10) {
+//                        double rate = (current_open_price - buy_price) / buy_price;
+//                        double revenue_rate = Math.floor((rate - fee) * 100.0);
+//                        //수수료 반영
+//                        invenstMoney = Math.floor(invenstMoney * (1.0 - fee));
+//                        //매매 횟수 증가
+//                        try_count += 1;
+//
+//                        //수익률이 0보다 크다면 익절 숫자 증가
+//                        if (revenue_rate > 0) {
+//                            stock_count += 1;
+//                        } else {
+//                            loss_count += 1;
+//                        }
+//
+//                        conclusionRes.setEnterType("sell");
+//                        conclusionRes.setEnterPrice(current_open_price);
+//                        conclusionRes.setCurrentBalanceKrw(invenstMoney);
+//                        conclusionRes.setSingleRate(Math.floor(revenue_rate));
+//                        conclusionRes.setTotalRate(((invenstMoney - origin_invenstMoney) / origin_invenstMoney) * 100.0);
+//
+//                        System.out.println("--------" + current_date + "-----------");
+//                        System.out.println("[전액 매도] " + ticker + " 종목 잔고 : " + invenstMoney + " 매도가 : " + current_open_price + " 수익률 : " + Math.floor(revenue_rate) + "%");
+//                        isBuy = false;
+//                    }
 
                     //final result를 만들기 위해 매일매일 ticker의 자산액을 total_money에 저장한다.
                     total_money.add(invenstMoney);
 
-                    if(conclusionRes.getEnterType() != null) {
-                        backTestResultResponseDto.getConclusionTestResponseDto().add(conclusionRes);
+
+                    //매수 매도 하지않은 날일 경우에도 수익률과 현재 잔고 정보를 세팅해줌.
+                    if(conclusionRes.getEnterType() == null) {
+                        conclusionRes.setEnterType("hold");
+                        conclusionRes.setEnterPrice(current_open_price);
+                        conclusionRes.setCurrentBalanceKrw(invenstMoney);
+                        conclusionRes.setTotalRate(((invenstMoney - origin_invenstMoney) / origin_invenstMoney) * 100.0);
                     }
+
+                    backTestResultResponseDto.getConclusionTestResponseDto().add(conclusionRes);
                 }
                 System.out.println("total_money count " + total_money.size());
 
@@ -201,6 +251,12 @@ public class BackTestServiceImpl implements BackTestService {
                 backTestResultResponseDto.setMaxProfitPercent(mr * 100.0);
                 backTestResultResponseDto.setMaxLossPercent(mdd * 100.0);
                 backTestResultResponseDto.setTotalResultPercent(result_percent * 100.0);
+
+                //resultData['OriRevenueHold'] =  (df['open'][-1]/df['open'][FirstDateIndex] - 1.0) * 100.0
+                //System.out.println("ohlcv.get(ohlcv.size() - 1)" + ohlcv.get(ohlcv.size() - 1).getClose());
+                //System.out.println("ohlcv.get(0).getOpen()" + ohlcv.get(0).getOpen());
+
+                backTestResultResponseDto.setSimpleHoldingPercent((ohlcv.get(ohlcv.size() - 1).getClose() / ohlcv.get(0).getOpen() - 1.0) * 100.0);
 
                 System.out.println("=======" + ticker + " 결과========");
                 System.out.println("total_money" + total_money.size());
@@ -221,7 +277,7 @@ public class BackTestServiceImpl implements BackTestService {
 
         System.out.println("=======최종 총 결과========");
 
-
         return result;
     }
+
 }

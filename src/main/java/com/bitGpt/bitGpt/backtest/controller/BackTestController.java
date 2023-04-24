@@ -24,4 +24,5 @@ public class BackTestController {
     public List<BackTestResultResponseDto> getBackTestResult(@RequestBody TestRequestDto requestDto) {
         return backTestService.getBackTestResult(requestDto);
     }
+
 }
